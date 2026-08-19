@@ -13,7 +13,7 @@ Low-latency trading infrastructure · C++20/23/26 · Python · OCaml · Financia
 │                          MARKET DATA LAYER                               │
 │                                                                          │
 │  udp-multicast-receiver  ←  MoldUDP64 / ITCH 5.0 feed handler           │
-│  SO_TIMESTAMPING · gap detection · PCAP replay · 65 tests               │
+│  SO_TIMESTAMPING · recvmmsg batch (64 datagrams/syscall) · 3/3 tests    │
 │                                                                          │
 │  fix-parser  ←  Zero-copy FIX 4.2/4.4 parser                           │
 │  p50 112ns full parse · p50 60ns fast parse · std::span zero-copy       │
@@ -24,90 +24,94 @@ Low-latency trading infrastructure · C++20/23/26 · Python · OCaml · Financia
 │                          MESSAGING LAYER                                 │
 │                                                                          │
 │  mpsc-queue  ←  Lock-free MPSC · 53.1M msg/sec                         │
-│  5-claim memory-model proof · x86-TSO · 18 TSan litmus tests            │
+│  Six-claim memory-model proof · 18 TSan litmus tests · push_batch API   │
 │                                                                          │
 │  io-uring-queue  ←  SPSC ring + io_uring async logger                  │
-│  p50 push 12ns · submission cost ~5ns (SQPOLL) · zero blocking          │
+│  p50 push 12ns · IOURingLogger p50 548ns · 375/375 tests                │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          MATCHING ENGINE                                 │
 │                                                                          │
-│  options-engine  ←  p50 add_order 38ns                                  │
-│  SoA LOB · AVX2 SIMD 2.0× · pool allocator · libFuzzer · 159/159 tests │
+│  options-engine  ←  p50 submit 28ns                                     │
+│  SoA LOB · AVX2 SIMD find_level 2.0× · pool allocator · PROFILING.md   │
 │                                                                          │
-│  low-latency-trading-engine  ←  full-stack C++20/OCaml                 │
-│  RDTSC timing · CPU pinning · ITCH 5.0 · Avellaneda-Stoikov             │
+│  low-latency-trading-engine  ←  full-stack C++20 + OCaml               │
+│  ITCH 5.0 · Kyle λ microstructure · 6/6 test suites                    │
 │                                                                          │
 │  hash-map  ←  Robin Hood + SSE4.2 SIMD-probe hash maps                 │
-│  < 1.5 avg probe (Robin Hood) · 1 SIMD op · Fibonacci hashing           │
+│  avg probe < 1.5 (Robin Hood) · 16-slot SIMD groups · 1212/1212 tests  │
 │                                                                          │
-│  cpp26-alloc  ←  Lock-free slab allocator · Pure C++26                  │
-│  Contracts P2900R6 · std::generator · std::expected · 102/102 tests     │
+│  cpp26-alloc  ←  C++26 allocator · Contracts P2900R6                    │
+│  std::generator · std::add_sat · std::saturate_cast · 102/102 tests    │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                       EXECUTION & ROUTING                                │
+│                          EXECUTION LAYER                                 │
 │                                                                          │
-│  sor (Smart Order Router)  ←  Multi-venue US equity routing             │
-│  BestPrice · LowestFee · ProRata · NYSE/NASDAQ/BATS/IEX fee model       │
+│  sor  ←  Smart Order Router                                             │
+│  BestPrice / LowestFee / ProRata · 4-venue fee model · VWAP · 18 tests  │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                    RESEARCH & SIGNAL LAYER                               │
+│                          QUANTITATIVE RESEARCH                           │
 │                                                                          │
-│  avellaneda-stoikov  ←  Optimal market making                           │
-│  Sharpe 10.02 vs naive 3.61 · 200 MC paths · kappa MLE                 │
+│  options-market-maker  ←  Heston Gil-Pelaez FFT · SSVI · vanna-volga   │
+│  Sharpe 2.26 · 89 tests (Python + OCaml QCheck)                        │
 │                                                                          │
-│  options-market-maker  ←  Black-Scholes · Heston · vanna-volga          │
-│  Delta hedger · Greeks management · backtest engine                      │
+│  avellaneda-stoikov  ←  Closed-form A-S market maker                   │
+│  Sharpe 10.0 vs 3.6 baseline · 87 tests · multi-agent LOB simulation   │
 │                                                                          │
-│  lob-microstructure-calibration  ←  Market microstructure               │
-│  Kyle λ (HAC/Newey-West) · Roll · OFI (70/30 OOS R²) · κ MLE          │
+│  lob-microstructure-calibration  ←  Kyle λ · Roll · kappa MLE · OFI   │
+│  HAC-robust OLS · Bartlett-corrected autocovariance · 18 tests         │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          FUNCTIONAL SYSTEMS                              │
 │                                                                          │
-│  alpha-research  ←  Signal research platform                            │
-│  IC/ICIR · Brinson attribution · IC lookahead corrected (3.76→1.08)    │
+│  ocaml-trading-primitives  ←  Functional LOB in OCaml                  │
+│  Make(P:PRIORITY) functor · CME Rule 512.B · 11/11 QCheck tests        │
 │                                                                          │
-│  ocaml-trading-primitives  ←  Functional trading primitives             │
-│  14 canonical probability results · 16,709-line QCheck suite            │
+│  competitive-programming  ←  Trading-oriented algorithms                │
+│  SegTree · SparseTable O(1) RMQ · DSU+rollback · CHT · 16/16 tests    │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## All Repositories
+## Repository Index
 
-### C++20/23/26 — Systems & Infrastructure
+### C++ Systems
 
-| Repo | What it does | Key signal |
-|------|-------------|------------|
-| [mpsc-queue](https://github.com/nisgemML/mpsc-queue) | Lock-free MPSC queue | 53.1M msg/sec · 5-claim memory-model proof · x86-TSO · 18 TSan litmus tests · 20,218 tests |
-| [options-engine](https://github.com/nisgemML/options-engine) | Options matching engine | p50 add_order 38ns · SoA LOB · AVX2 SIMD 2.0× · libFuzzer · 159/159 tests |
-| [cpp26-alloc](https://github.com/nisgemML/cpp26-alloc) | Lock-free slab allocator | Pure C++26 · Contracts P2900R6 · std::generator · std::expected · 102/102 tests · TSan+ASan |
-| [udp-multicast-receiver](https://github.com/nisgemML/udp-multicast-receiver) | Market data feed handler | MoldUDP64 · ITCH 5.0 · SO_TIMESTAMPING · PCAP replay · 65 tests |
-| [fix-parser](https://github.com/nisgemML/fix-parser) | Zero-copy FIX 4.2/4.4 parser | p50 112ns full · p50 60ns fast · std::span zero-copy · no heap allocation |
-| [hash-map](https://github.com/nisgemML/hash-map) | Robin Hood + SIMD-probe hash maps | < 1.5 avg probe · 1 SIMD op (SSE4.2) · Fibonacci hashing · backward-shift delete |
-| [io-uring-queue](https://github.com/nisgemML/io-uring-queue) | SPSC ring + io_uring async logger | p50 push 12ns · ~5ns SQPOLL submission · zero hot-path blocking |
-| [sor](https://github.com/nisgemML/sor) | Smart Order Router | BestPrice / LowestFee / ProRata · NYSE/NASDAQ/BATS/IEX · 18 tests |
-| [low-latency-trading-engine](https://github.com/nisgemML/low-latency-trading-engine) | Full-stack trading engine | RDTSC · CPU pinning · ITCH 5.0 · A-S market maker |
+| Repo | Signal | Key numbers |
+|------|--------|-------------|
+| [mpsc-queue](https://github.com/nisgemML/mpsc-queue) | Lock-free MPSC, six-claim formal proof | 53.1M msg/sec, 18 TSan litmus tests |
+| [options-engine](https://github.com/nisgemML/options-engine) | AVX2 SIMD matching engine | p50=28ns, 2.0× SIMD speedup, PROFILING.md |
+| [fix-parser](https://github.com/nisgemML/fix-parser) | Zero-copy FIX 4.2/4.4 | 112ns full / 60ns fast, 34 tests |
+| [udp-multicast-receiver](https://github.com/nisgemML/udp-multicast-receiver) | MoldUDP64/ITCH 5.0 feed handler | SO_TIMESTAMPING, recvmmsg, 3 tests |
+| [hash-map](https://github.com/nisgemML/hash-map) | Robin Hood + SSE4.2 SIMD probe | avg probe <1.5, 1212 tests |
+| [io-uring-queue](https://github.com/nisgemML/io-uring-queue) | SPSC ring + io_uring logger | p50 push=12ns, 375 tests |
+| [sor](https://github.com/nisgemML/sor) | Smart order router | BestPrice/LowestFee/ProRata, 18 tests |
+| [cpp26-alloc](https://github.com/nisgemML/cpp26-alloc) | C++26 Contracts allocator | P2900R6, std::generator, 102 tests |
+| [low-latency-trading-engine](https://github.com/nisgemML/low-latency-trading-engine) | Full-stack C++20 + OCaml | Kyle λ sim, ITCH 5.0, 6 test suites |
 
-### Python — Quantitative Research
+### Quantitative Research
 
-| Repo | What it does | Key signal |
-|------|-------------|------------|
-| [avellaneda-stoikov](https://github.com/nisgemML/avellaneda-stoikov) | Optimal market making | Sharpe 10.02 vs naive 3.61 (2.8×) · 200 MC paths · Poisson MLE · adverse selection model |
-| [alpha-research](https://github.com/nisgemML/alpha-research) | Alpha signal platform | IC/ICIR · Brinson-Hood-Beebower · purged k-fold CV · **IC lookahead corrected (t-stat 3.76→1.08)** |
-| [lob-microstructure-calibration](https://github.com/nisgemML/lob-microstructure-calibration) | Microstructure estimators | Kyle λ (HAC/Newey-West) · Roll (delta SE) · OFI (OOS R²) · κ (Poisson MLE) |
-| [options-market-maker](https://github.com/nisgemML/options-market-maker) | Options market maker | Black-Scholes · Heston · vanna-volga · delta hedger · Greeks management |
+| Repo | Signal | Key numbers |
+|------|--------|-------------|
+| [options-market-maker](https://github.com/nisgemML/options-market-maker) | Heston FFT, SSVI, vanna-volga | Sharpe 2.26, 89 tests |
+| [avellaneda-stoikov](https://github.com/nisgemML/avellaneda-stoikov) | A-S stochastic control | Sharpe 10.0 vs 3.6 baseline, 87 tests |
+| [lob-microstructure-calibration](https://github.com/nisgemML/lob-microstructure-calibration) | Kyle λ, Roll, kappa MLE, OFI | HAC-robust, real AAPL LOBSTER data |
 
-### OCaml — Functional Verification
+### Functional Systems
 
-| Repo | What it does | Key signal |
-|------|-------------|------------|
-| [ocaml-trading-primitives](https://github.com/nisgemML/ocaml-trading-primitives) | Functional trading primitives | 14 canonical probability results · 16,709-line QCheck property-based suite |
+| Repo | Signal | Key numbers |
+|------|--------|-------------|
+| [ocaml-trading-primitives](https://github.com/nisgemML/ocaml-trading-primitives) | Make(P:PRIORITY) functor, CME Rule 512.B | 11/11 QCheck property tests |
+| [competitive-programming](https://github.com/nisgemML/competitive-programming) | SegTree, SparseTable, DSU+rollback, CHT | 16/16 tests, trading use cases |
 
 ---
 
@@ -117,14 +121,14 @@ Low-latency trading infrastructure · C++20/23/26 · Python · OCaml · Financia
 The producer's release store on `next` and the consumer's acquire load establish
 the happens-before chain that makes the payload visible. `seq_cst` (MFENCE on
 x86) is unnecessary and costs ~15 cycles per push. The formal proof in
-[mpsc-queue](https://github.com/nisgemML/mpsc-queue) documents all 5 claims
+[mpsc-queue](https://github.com/nisgemML/mpsc-queue) documents all six claims
 with an explicit x86-TSO instruction table proving the weaker ordering suffices.
 
 **Why SoA beats pointer-based order books by ~25ns per match**
 A pointer-based LOB chases pointers across cache lines during the matching sweep —
 3 cache misses per match. SoA keeps `prices[]` as a hot contiguous array; at 128
 levels the entire array fits in L1 cache. Measured difference: ~25ns per match,
-confirmed in options-engine benchmarks.
+confirmed in options-engine benchmarks with committed PROFILING.md.
 
 **Why Robin Hood with backward-shift deletion**
 Tombstone deletion accumulates probe length under heavy cancel churn — degrades
@@ -138,7 +142,13 @@ io_uring SQPOLL submits writes via a plain memory store (~5ns) — the kernel
 polls the SQ ring from a pinned kernel thread. No syscall, no context switch,
 no interference with the matching thread critical path.
 
-**Why the A-S Sharpe (10.02) is honest, not cherry-picked**
+**Why recvmmsg over recvmsg for market data**
+At 1M packets/sec, individual recvmsg() calls cost 200ms CPU/sec in syscall
+overhead alone. recvmmsg() with batch=64 reduces this to 3.1ms/sec — 64×
+reduction. Trade-off: up to 63 × inter-packet latency added; acceptable for
+feed handler, not for the matching engine.
+
+**Why the A-S Sharpe (10.0) is honest, not cherry-picked**
 1,000 paths, fresh seed per path, PnL = cash + inventory × final_mid, Sharpe
 computed across all paths — not the best. Naive uses identical engine and seeds.
 The 2.8× improvement is solely from inventory skew — ablated and documented in
@@ -149,22 +159,30 @@ Rolling IC weights including future returns inflated the t-stat to 3.76. After
 fixing the weight shift, t-stat = 1.08 — borderline, not highly significant.
 This is the correct result. Reporting it honestly is the only valid approach.
 
+**Why Make(P:PRIORITY) functor in OCaml**
+PriceTime and ProRata priority are exchange-specific rules that change without
+warning (CME Rule 512.B add_order_front for reduce-only replaces). The functor
+separates the priority policy from the matching logic — swap priority without
+touching the matching core. This is the idiom Jane Street uses in their trading
+systems.
+
 ---
 
 ## Production Readiness Scorecard
 
 | Component | Status | Remaining gap |
-|-----------|--------|--------------|
+|-----------|--------|---------------|
 | MPSC queue | ✅ Complete | Integration into engine hot path |
-| Options matching engine | ✅ Complete | Multi-symbol sharding (in progress) |
-| cpp26-alloc | ✅ Complete | 24h stability test under load |
-| Market data feed handler | ✅ Complete | Hardware timestamp correlation |
+| Options matching engine | ✅ Complete | Multi-symbol sharding |
 | FIX parser | ✅ Complete | Full session-layer state machine |
+| Market data feed handler | ✅ Complete | Hardware timestamp correlation |
 | Hash map | ✅ Complete | In-engine integration benchmarks |
 | io_uring async logger | ✅ Complete | Multi-sink backends |
 | Smart Order Router | ✅ Complete | Real multi-venue historical data |
+| cpp26-alloc | ✅ Complete | 24h stability test under load |
 | A-S market maker | ✅ Complete | Real ITCH data calibration (in progress) |
-| Alpha research | ✅ Complete | Live paper trading results |
+| Microstructure calibration | ✅ Complete | Live LOB data pipeline |
+| Options market maker | ✅ Complete | Live vol surface feed |
 | Risk layer (pre-trade) | 🔧 In progress | Hard latency budgets |
 | Multi-symbol sharding | 🔧 In progress | Per-symbol CPU affinity |
 | Kernel bypass (DPDK) | 📋 Designed | NIC hardware required |
@@ -179,13 +197,13 @@ close in the first 3–6 months at a firm with appropriate infrastructure.
 
 ## Background
 
-12+ years delivering trading infrastructure at Morgan Stanley and State Street.
-M.S. Computer Science (Texas A&M). Post-Graduate Certificate AI/ML (Purdue).
-Self-study: Hull's *Options, Futures & Other Derivatives*; Shreve's *Stochastic
-Calculus for Finance Vol II*. Active Putnam-style mathematics blog.
+13 years delivering software infrastructure across financial services (Morgan Stanley,
+State Street Alpha Frontier via TCS), payments (Worldpay), and enterprise systems.
+M.S. Computer Science, Texas A&M University–Commerce.
+Post-Graduate Certificate AI/ML, Purdue University.
 
 ---
 
 *All benchmark numbers reproducible — build instructions in each repo's README.*
-*Environment: Ubuntu 22.04/24.04, GCC 13/14, x86-64 container. Container*
-*numbers reported honestly; isolated-core predictions noted where applicable.*
+*Environment: Ubuntu 22.04/24.04, GCC 12/13/14, x86-64. Container numbers reported*
+*honestly; isolated-core predictions noted where applicable.*
