@@ -67,8 +67,8 @@ Low-latency trading infrastructure · C++20/23/26 · Python · OCaml · Financia
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          EXECUTION LAYER                                 │
 │                                                                          │
-│  sor  ←  Smart Order Router                                             │
-│  BestPrice / LowestFee / ProRata · 4-venue fee model · VWAP · 18 tests  │
+│  sor  ←  Smart Order Router                                              │
+│  BestPrice / LowestFee / ProRata · 4-venue fee model · VWAP · 18 tests   │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
