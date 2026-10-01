@@ -12,87 +12,96 @@ Low-latency trading infrastructure · C++20/23/26 · Python · OCaml · Financia
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          MARKET DATA LAYER                               │
 │                                                                          │
-│  udp-multicast-receiver  ←  MoldUDP64 / ITCH 5.0 feed handler            │
-│  SO_TIMESTAMPING · recvmmsg batch (64 datagrams/syscall) · 3/3 tests     │
+│  udp-multicast-receiver  ←  MoldUDP64 / ITCH 5.0 feed handler           │
+│  SO_TIMESTAMPING · recvmmsg batch (64 datagrams/syscall) · 3/3 tests    │
 │                                                                          │
-│  fix-parser  ←  Zero-copy FIX 4.2/4.4 parser                             │
-│  p50 112ns full parse · p50 60ns fast parse · std::span zero-copy        │
+│  fix-parser  ←  Zero-copy FIX 4.2/4.4 parser                           │
+│  p50 112ns full parse · p50 60ns fast parse · std::span zero-copy       │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          MESSAGING LAYER                                 │
 │                                                                          │
-│  mpsc-queue  ←  Lock-free MPSC · beats mutex/spinlock/boost::lockfree    │
-│  by 3.7-4.3x (real hardware, median of 5 runs) · six-claim formal proof  │
-│  · 18 TSan litmus tests · push_batch API                                 │
+│  mpsc-queue  ←  Lock-free MPSC · beats mutex/spinlock/boost::lockfree   │
+│  by 3.7-4.3x (real hardware, median of 5 runs) · six-claim formal proof │
+│  · 18 TSan litmus tests · push_batch API                               │
 │                                                                          │
-│  io-uring-queue  ←  SPSC ring + io_uring async logger                    │
-│  ring push/pop p50=215ns · io_uring cuts producer-thread p50 by ~9x      │
-│  vs synchronous write() · 6,322 assertions across 2 CTest suites         │
+│  io-uring-queue  ←  SPSC ring + io_uring async logger                  │
+│  ring push/pop p50=215ns · io_uring cuts producer-thread p50 by ~9x    │
+│  vs synchronous write() · 6,322 assertions across 2 CTest suites       │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                    INTEGRATION LAYER — NEW                               │
+│                    INTEGRATION LAYER                                     │
 │                                                                          │
-│  tick-to-trade  ←  Real two-thread pipeline: feed → MpscQueue →          │
-│  decision → IOURingLogger, using the actual source of the three          │
-│  repos above (vendored, not reimplemented). Differential-tested          │
-│  against an independent reference order book, deterministic replay,      │
-│  a real methodology mistake caught mid-benchmark and documented.         │
-│  Milestones 1-3 of 5 complete (skeleton, correctness hardening,          │
-│  measurement) — see that repo's own README for what's still open.        │
+│  tick-to-trade  ←  Four independently-deep repos (mpsc-queue,           │
+│  io-uring-queue, udp-multicast-receiver, options-engine) composed       │
+│  into one measurable pipeline, plus a real inventory-aware market       │
+│  maker consuming its own fills. 12 real composition-layer bugs found    │
+│  via ASan/TSan and real multi-core hardware — not a single-core dev    │
+│  sandbox — documented in BUGS_FOUND.md, not hidden. MarketMaker's       │
+│  inventory skew calibrated against real BTCUSDT volatility (Binance    │
+│  public API), verified stable before shipping. io_uring logging is     │
+│  actually wired in (-DHFT_WITH_IOURING=ON) and verified byte-identical │
+│  against the default path — not vendored-but-unused.                   │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          MATCHING ENGINE                                 │
 │                                                                          │
-│  options-engine  ←  p50 submit 28ns (see that repo's own PROFILING.md    │
-│  for a noted discrepancy against its README figure, not yet reconciled)  │
-│  SoA LOB · AVX2 SIMD find_level 2.0× · pool allocator                    │
+│  options-engine  ←  p50 submit 28ns (see that repo's own PROFILING.md   │
+│  for a noted discrepancy against its README figure, not yet reconciled) │
+│  SoA LOB · AVX2 SIMD find_level 2.0× · pool allocator                  │
 │                                                                          │
-│  low-latency-trading-engine  ←  full-stack C++20 + OCaml                 │
-│  ITCH 5.0 · Kyle λ microstructure · 6/6 test suites                      │
+│  low-latency-trading-engine  ←  full-stack C++20 + OCaml               │
+│  ITCH 5.0 · Kyle λ microstructure · 6/6 test suites                    │
 │                                                                          │
-│  hash-map  ←  Robin Hood + SSE4.2 SIMD-probe hash maps                   │
-│  avg probe < 1.5 (Robin Hood) · 16-slot SIMD groups · 1212/1212 tests    │
+│  hash-map  ←  Robin Hood + SSE4.2 SIMD-probe hash maps                 │
+│  avg probe < 1.5 (Robin Hood) · 16-slot SIMD groups · 1212/1212 tests  │
 │                                                                          │
-│  cpp26-alloc  ←  C++26 allocator · Contracts P2900R6                     │
-│  std::generator · std::add_sat · std::saturate_cast · 102/102 tests      │
+│  cpp26-alloc  ←  C++26 allocator · Contracts P2900R6                    │
+│  std::generator · std::add_sat · std::saturate_cast · 102/102 tests    │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          EXECUTION LAYER                                 │
 │                                                                          │
-│  sor  ←  Smart Order Router                                              │
-│  BestPrice / LowestFee / ProRata · 4-venue fee model · VWAP · 18 tests   │
+│  sor  ←  Smart Order Router                                             │
+│  BestPrice / LowestFee / ProRata · 4-venue fee model · VWAP · 18 tests  │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          QUANTITATIVE RESEARCH                           │
 │                                                                          │
-│  options-market-maker  ←  Heston Gil-Pelaez FFT · SSVI · vanna-volga     │
-│  Sharpe 2.26 · 89 tests (Python + OCaml QCheck)                          │
+│  quant-signal-research  ←  Short-horizon return-direction signal study │
+│  on real BTCUSDT 1-minute data (Jul 2024-Jun 2025). AUC 0.521           │
+│  [0.512, 0.529], Bonferroni-corrected, consistent across all 5          │
+│  walk-forward folds — detectable, below a 40bps cost hurdle. Reported   │
+│  honestly as "detectable, not tradeable" rather than oversold.          │
 │                                                                          │
-│  avellaneda-stoikov  ←  Closed-form A-S market maker                     │
-│  Sharpe 10.0 vs 3.6 baseline · 87 tests · multi-agent LOB simulation     │
+│  options-market-maker  ←  Heston Gil-Pelaez FFT · SSVI · vanna-volga   │
+│  Sharpe 2.26 · 89 tests (Python + OCaml QCheck)                        │
 │                                                                          │
-│  lob-microstructure-calibration  ←  Kyle λ · Roll · kappa MLE · OFI      │
-│  HAC-robust OLS · Bartlett-corrected autocovariance · 18 tests           │
+│  avellaneda-stoikov  ←  Closed-form A-S market maker                   │
+│  Sharpe 10.0 vs 3.6 baseline · 87 tests · multi-agent LOB simulation   │
+│                                                                          │
+│  lob-microstructure-calibration  ←  Kyle λ · Roll · kappa MLE · OFI   │
+│  HAC-robust OLS · Bartlett-corrected autocovariance · 18 tests         │
 └──────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          FUNCTIONAL SYSTEMS                              │
 │                                                                          │
-│  ocaml-trading-primitives  ←  Functional LOB in OCaml                    │
-│  Make(P:PRIORITY) functor · CME Rule 512.B · 11/11 QCheck tests          │
+│  ocaml-trading-primitives  ←  Functional LOB in OCaml                  │
+│  Make(P:PRIORITY) functor · CME Rule 512.B · 11/11 QCheck tests        │
 │                                                                          │
-│  competitive-programming  ←  Trading-oriented algorithms                 │
-│  SegTree · SparseTable O(1) RMQ · DSU+rollback · CHT · 16/16 tests       │
+│  competitive-programming  ←  Trading-oriented algorithms                │
+│  SegTree · SparseTable O(1) RMQ · DSU+rollback · CHT · 16/16 tests    │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -104,7 +113,7 @@ Low-latency trading infrastructure · C++20/23/26 · Python · OCaml · Financia
 
 | Repo | Signal | Key numbers |
 |------|--------|-------------|
-| [tick-to-trade](https://github.com/nisgemML/tick-to-trade) | Real integration: feed → MpscQueue → decision → IOURingLogger | 4,850 differential comparisons vs an independent reference book, deterministic replay, Milestones 1-3/5 complete |
+| [tick-to-trade](https://github.com/nisgemML/tick-to-trade) | Real integration: feed → MpscQueue → decision → IOURingLogger, plus a calibrated market maker | 12 real bugs found (ASan/TSan + real multi-core hardware), MarketMaker calibrated against real BTCUSDT volatility, io_uring logging verified wired-in and byte-identical to the default path |
 | [mpsc-queue](https://github.com/nisgemML/mpsc-queue) | Lock-free MPSC, six-claim formal proof | 3.7-4.3x faster than mutex/spinlock/boost::lockfree::queue (real hardware, median of 5 runs), 18 TSan litmus tests |
 | [options-engine](https://github.com/nisgemML/options-engine) | AVX2 SIMD matching engine | p50=28ns, 2.0× SIMD speedup, PROFILING.md (see note below on an unreconciled figure) |
 | [fix-parser](https://github.com/nisgemML/fix-parser) | Zero-copy FIX 4.2/4.4 | 112ns full / 60ns fast, 34 tests |
@@ -119,6 +128,7 @@ Low-latency trading infrastructure · C++20/23/26 · Python · OCaml · Financia
 
 | Repo | Signal | Key numbers |
 |------|--------|-------------|
+| [quant-signal-research](https://github.com/nisgemML/quant-signal-research) | Short-horizon return-direction signal study, real BTCUSDT 1-minute data | AUC 0.521 [0.512, 0.529], Bonferroni-corrected, fold-consistent (worst-fold AUC 0.515) — detectable, below a 40bps cost hurdle |
 | [options-market-maker](https://github.com/nisgemML/options-market-maker) | Heston FFT, SSVI, vanna-volga | Sharpe 2.26, 89 tests |
 | [avellaneda-stoikov](https://github.com/nisgemML/avellaneda-stoikov) | A-S stochastic control | Sharpe 10.0 vs 3.6 baseline, 87 tests |
 | [lob-microstructure-calibration](https://github.com/nisgemML/lob-microstructure-calibration) | Kyle λ, Roll, kappa MLE, OFI | HAC-robust, real AAPL LOBSTER data |
@@ -170,9 +180,11 @@ of an out-of-date submodule pointer silently changing what a benchmark actually
 ran against. The trade-off, stated plainly: each vendored file's source of truth
 remains its origin repo — a bug fix in the queue belongs in mpsc-queue, not
 copy-pasted forward, and vendored copies can drift from their origin if not
-periodically re-synced. That trade-off is worth it for a portfolio piece meant
-to be cloned and built in five minutes by someone who has never seen the other
-14 repos.
+periodically re-synced (this actually happened — `third_party/mpsc-queue`
+inside tick-to-trade went stale relative to mpsc-queue's own real-hardware
+benchmarking pass, and needed an explicit re-sync once caught). That trade-off
+is worth it for a portfolio piece meant to be cloned and built in five minutes
+by someone who has never seen the other 14 repos.
 
 **Why SoA beats pointer-based order books by ~25ns per match**
 A pointer-based LOB chases pointers across cache lines during the matching sweep —
@@ -202,6 +214,21 @@ computed across all paths — not the best. Naive uses identical engine and seed
 The 2.8× improvement is solely from inventory skew — ablated and documented in
 [avellaneda-stoikov/SIMULATION_RESULTS.md](https://github.com/nisgemML/avellaneda-stoikov).
 
+**Why the quant-signal-research verdict is "detectable, not tradeable" — and why that's the right answer, not a weak one**
+[quant-signal-research](https://github.com/nisgemML/quant-signal-research)'s
+primary pre-registered configuration (`logit_all`, 5-minute horizon, 1-bar
+delay) detects a real signal — AUC 0.521 [0.512, 0.529], consistent across
+every one of 5 walk-forward folds, not just a lucky holdout split — at a gross
+edge of 0.15bps against a 40bps round-trip cost. That's gating by a mechanical
+rule applied to a pre-registered config, not picking the best-looking metric
+after the fact: a weaker single-feature baseline tested alongside it correctly
+shows no detectable signal at the same horizon. The univariate feature-IC
+table shows negative rank correlation on recent returns and taker imbalance —
+the textbook signature of short-horizon microstructure reversal, not an
+arbitrary pattern. Reporting "detectable but not tradeable" honestly, with the
+walk-forward evidence to back it, is a stronger research-track signal than a
+suspiciously clean profitable backtest would have been.
+
 **Why the IC lookahead correction matters**
 Rolling IC weights including future returns inflated the t-stat to 3.76. After
 fixing the weight shift, t-stat = 1.08 — borderline, not highly significant.
@@ -214,16 +241,21 @@ separates the priority policy from the matching logic — swap priority without
 touching the matching core. This is the idiom Jane Street uses in their trading
 systems.
 
-**A real bug caught while integrating, kept as a finding**
-tick-to-trade's first working pipeline had no backpressure between the feed
-thread and the decision thread — the feed thread, pure CPU-bound parsing, raced
-arbitrarily far ahead of the decision thread, which does real work per event.
-Result: a 3.9ms mean latency that was almost entirely queue backlog, not
-processing cost. This was the identical mistake an earlier version of
-mpsc-queue's own tick-to-trade benchmark shipped with. Same fix both times:
-bound how far ahead the producer can get. Kept in both repos' git history and
-documentation as a finding, not silently corrected — the point of documenting a
-caught bug is that it happened, not that it was eventually fixed.
+**Real bugs caught while integrating, kept as findings**
+Two separate times, the same mistake: an unbounded feed thread racing ahead of
+a slower consumer thread, measured as a huge but meaningless latency number
+until bounded backpressure was added. First in mpsc-queue's own tick-to-trade
+benchmark, then again in tick-to-trade's own pipeline — same root cause, same
+fix, caught independently both times rather than assumed-fixed-by-association.
+Separately: tick-to-trade's README once advertised "io_uring async logger" as
+the active logging path; grepping the actual source showed the vendored
+io-uring-queue dependency was never linked into the pipeline at all — real
+dead weight behind real prose. Fixed by actually wiring a `HFT_WITH_IOURING`
+build option and verifying byte-identical output against the default path
+across 7,236 records, not just making the docs vaguer. Both are documented in
+their respective BUGS_FOUND.md / git history as findings, not silently
+patched — the point of documenting a caught bug is that it happened, not that
+it was eventually fixed.
 
 ---
 
@@ -237,7 +269,8 @@ caught bug is that it happened, not that it was eventually fixed.
 | Market data feed handler | ✅ Complete | Hardware timestamp correlation |
 | Hash map | ✅ Complete | In-engine integration benchmarks |
 | io_uring async logger | ✅ Complete | Multi-sink backends |
-| **tick-to-trade (integration)** | 🔧 **In progress — Milestones 1-3/5** | Live multicast wiring, gap/loss injection at integration level, logger-overflow policy, LIMITATIONS.md, interview-prep polish |
+| **tick-to-trade (integration)** | 🔧 **Mature, actively hardened — 12 real bugs found & fixed, real multi-core hardware validated** | Live multicast wiring (interface already exists, not yet connected); true `recv_ns` from SO_TIMESTAMPING; market maker explicitly not a calibrated trading strategy (no backtest harness) by its own documentation |
+| **quant-signal-research** | ✅ **Complete as a research artifact** | Single symbol (BTCUSDT) and single asset class; a genuinely different signal or asset would need its own study, not an extension of this one |
 | Smart Order Router | ✅ Complete | Real multi-venue historical data |
 | cpp26-alloc | ✅ Complete | 24h stability test under load |
 | A-S market maker | ✅ Complete | Real ITCH data calibration (in progress) |
@@ -249,21 +282,23 @@ caught bug is that it happened, not that it was eventually fixed.
 | 24h+ stability tests | 📋 Planned | Dedicated bare-metal required |
 
 **Honest gaps:** Components are individually production-quality with real benchmarks.
-tick-to-trade is the first attempt at wiring several of them into one measured
-system rather than leaving that integration as an unverified claim — it's
-mid-way through its own 5-milestone plan, not finished, and says so in its own
-README rather than being presented as done. Remaining work across the portfolio:
-full system integration beyond what tick-to-trade covers so far, long-running
-stability under realistic sustained load, and kernel-bypass networking
-(hardware-dependent). These gaps close in the first 3-6 months at a firm with
-appropriate infrastructure.
+tick-to-trade is the most mature demonstration of wiring several of them into one
+measured system — not finished (it has its own documented roadmap), but no
+longer a thin first pass either: 12 real composition bugs found and fixed,
+validated on real multi-core hardware, with a market maker calibrated against
+real market data rather than synthetic assumptions. quant-signal-research closes
+the research-track gap with a real, walk-forward-verified finding rather than an
+unexecuted pipeline. Remaining work across the portfolio: live multicast
+wiring, long-running stability under realistic sustained load, and kernel-bypass
+networking (hardware-dependent). These gaps close in the first 3-6 months at a
+firm with appropriate infrastructure.
 
 ---
 
 ## Background
 
 13 years delivering software infrastructure across financial services (Morgan Stanley,
-State Street via TCS), payments (Worldpay), and enterprise systems.
+State Street Alpha Frontier via TCS), payments (Worldpay), and enterprise systems.
 M.S. Computer Science, Texas A&M University–Commerce.
 Post-Graduate Certificate AI/ML, Purdue University.
 
@@ -271,6 +306,8 @@ Post-Graduate Certificate AI/ML, Purdue University.
 
 *All benchmark numbers reproducible — build instructions in each repo's README.*
 *Environment: Ubuntu 22.04/24.04, GCC 12/13/14, x86-64, plus WSL2 on real laptop*
-*hardware for mpsc-queue's cross-thread figures. Container numbers reported*
-*honestly; single-vCPU-sandbox and pending-real-hardware numbers labeled as such*
-*where applicable — see each repo's own BENCHMARK_RESULTS.md for the exact tier.*
+*hardware for mpsc-queue's and tick-to-trade's cross-thread and multi-core*
+*figures, and for quant-signal-research's real BTCUSDT data pull. Container*
+*numbers reported honestly; single-vCPU-sandbox and pending-real-hardware*
+*numbers labeled as such where applicable — see each repo's own*
+*BENCHMARK_RESULTS.md for the exact tier.*
