@@ -297,7 +297,7 @@ firm with appropriate infrastructure.
 
 ## Background
 
-13 years delivering software infrastructure across financial services (Morgan Stanley,
+14 years delivering software infrastructure across financial services (Morgan Stanley,
 State Street Alpha Frontier via TCS), payments (Worldpay), and enterprise systems.
 M.S. Computer Science, Texas A&M University–Commerce.
 Post-Graduate Certificate AI/ML, Purdue University.
