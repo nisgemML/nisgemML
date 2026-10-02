@@ -12,96 +12,96 @@ Low-latency trading infrastructure · C++20/23/26 · Python · OCaml · Financia
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          MARKET DATA LAYER                               │
 │                                                                          │
-│  udp-multicast-receiver  ←  MoldUDP64 / ITCH 5.0 feed handler           │
-│  SO_TIMESTAMPING · recvmmsg batch (64 datagrams/syscall) · 3/3 tests    │
+│  udp-multicast-receiver  ←  MoldUDP64 / ITCH 5.0 feed handler            │
+│  SO_TIMESTAMPING · recvmmsg batch (64 datagrams/syscall) · 3/3 tests     │
 │                                                                          │
-│  fix-parser  ←  Zero-copy FIX 4.2/4.4 parser                           │
-│  p50 112ns full parse · p50 60ns fast parse · std::span zero-copy       │
+│  fix-parser  ←  Zero-copy FIX 4.2/4.4 parser                             │
+│  p50 112ns full parse · p50 60ns fast parse · std::span zero-copy        │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          MESSAGING LAYER                                 │
 │                                                                          │
-│  mpsc-queue  ←  Lock-free MPSC · beats mutex/spinlock/boost::lockfree   │
-│  by 3.7-4.3x (real hardware, median of 5 runs) · six-claim formal proof │
-│  · 18 TSan litmus tests · push_batch API                               │
+│  mpsc-queue  ←  Lock-free MPSC · beats mutex/spinlock/boost::lockfree    │
+│  by 3.7-4.3x (real hardware, median of 5 runs) · six-claim formal proof  │
+│  · 18 TSan litmus tests · push_batch API                                 │
 │                                                                          │
-│  io-uring-queue  ←  SPSC ring + io_uring async logger                  │
-│  ring push/pop p50=215ns · io_uring cuts producer-thread p50 by ~9x    │
-│  vs synchronous write() · 6,322 assertions across 2 CTest suites       │
+│  io-uring-queue  ←  SPSC ring + io_uring async logger                    │
+│  ring push/pop p50=215ns · io_uring cuts producer-thread p50 by ~9x      │
+│  vs synchronous write() · 6,322 assertions across 2 CTest suites         │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                    INTEGRATION LAYER                                     │
 │                                                                          │
-│  tick-to-trade  ←  Four independently-deep repos (mpsc-queue,           │
-│  io-uring-queue, udp-multicast-receiver, options-engine) composed       │
-│  into one measurable pipeline, plus a real inventory-aware market       │
-│  maker consuming its own fills. 12 real composition-layer bugs found    │
-│  via ASan/TSan and real multi-core hardware — not a single-core dev    │
-│  sandbox — documented in BUGS_FOUND.md, not hidden. MarketMaker's       │
-│  inventory skew calibrated against real BTCUSDT volatility (Binance    │
-│  public API), verified stable before shipping. io_uring logging is     │
-│  actually wired in (-DHFT_WITH_IOURING=ON) and verified byte-identical │
-│  against the default path — not vendored-but-unused.                   │
+│  tick-to-trade  ←  Four independently-deep repos (mpsc-queue,            │
+│  io-uring-queue, udp-multicast-receiver, options-engine) composed        │
+│  into one measurable pipeline, plus a real inventory-aware market        │
+│  maker consuming its own fills. 12 real composition-layer bugs found     │
+│  via ASan/TSan and real multi-core hardware — not a single-core dev      │
+│  sandbox — documented in BUGS_FOUND.md, not hidden. MarketMaker's        │
+│  inventory skew calibrated against real BTCUSDT volatility (Binance      │
+│  public API), verified stable before shipping. io_uring logging is       │
+│  actually wired in (-DHFT_WITH_IOURING=ON) and verified byte-identical   │
+│  against the default path — not vendored-but-unused.                     │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          MATCHING ENGINE                                 │
 │                                                                          │
-│  options-engine  ←  p50 submit 28ns (see that repo's own PROFILING.md   │
-│  for a noted discrepancy against its README figure, not yet reconciled) │
-│  SoA LOB · AVX2 SIMD find_level 2.0× · pool allocator                  │
+│  options-engine  ←  p50 submit 28ns (see that repo's own PROFILING.md    │
+│  for a noted discrepancy against its README figure, not yet reconciled)  │
+│  SoA LOB · AVX2 SIMD find_level 2.0× · pool allocator                    │
 │                                                                          │
-│  low-latency-trading-engine  ←  full-stack C++20 + OCaml               │
-│  ITCH 5.0 · Kyle λ microstructure · 6/6 test suites                    │
+│  low-latency-trading-engine  ←  full-stack C++20 + OCaml                 │
+│  ITCH 5.0 · Kyle λ microstructure · 6/6 test suites                      │
 │                                                                          │
-│  hash-map  ←  Robin Hood + SSE4.2 SIMD-probe hash maps                 │
-│  avg probe < 1.5 (Robin Hood) · 16-slot SIMD groups · 1212/1212 tests  │
+│  hash-map  ←  Robin Hood + SSE4.2 SIMD-probe hash maps                   │
+│  avg probe < 1.5 (Robin Hood) · 16-slot SIMD groups · 1212/1212 tests    │
 │                                                                          │
-│  cpp26-alloc  ←  C++26 allocator · Contracts P2900R6                    │
-│  std::generator · std::add_sat · std::saturate_cast · 102/102 tests    │
+│  cpp26-alloc  ←  C++26 allocator · Contracts P2900R6                     │
+│  std::generator · std::add_sat · std::saturate_cast · 102/102 tests      │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          EXECUTION LAYER                                 │
 │                                                                          │
-│  sor  ←  Smart Order Router                                             │
-│  BestPrice / LowestFee / ProRata · 4-venue fee model · VWAP · 18 tests  │
+│  sor  ←  Smart Order Router                                              │
+│  BestPrice / LowestFee / ProRata · 4-venue fee model · VWAP · 18 tests   │
 └──────────────────────┬───────────────────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          QUANTITATIVE RESEARCH                           │
 │                                                                          │
-│  quant-signal-research  ←  Short-horizon return-direction signal study │
-│  on real BTCUSDT 1-minute data (Jul 2024-Jun 2025). AUC 0.521           │
-│  [0.512, 0.529], Bonferroni-corrected, consistent across all 5          │
-│  walk-forward folds — detectable, below a 40bps cost hurdle. Reported   │
-│  honestly as "detectable, not tradeable" rather than oversold.          │
+│  quant-signal-research  ←  Short-horizon return-direction signal study   │
+│  on real BTCUSDT 1-minute data (Jul 2024-Jun 2025). AUC 0.521            │
+│  [0.512, 0.529], Bonferroni-corrected, consistent across all 5           │
+│  walk-forward folds — detectable, below a 40bps cost hurdle. Reported    │
+│  honestly as "detectable, not tradeable" rather than oversold.           │
 │                                                                          │
-│  options-market-maker  ←  Heston Gil-Pelaez FFT · SSVI · vanna-volga   │
-│  Sharpe 2.26 · 89 tests (Python + OCaml QCheck)                        │
+│  options-market-maker  ←  Heston Gil-Pelaez FFT · SSVI · vanna-volga     │
+│  Sharpe 2.26 · 89 tests (Python + OCaml QCheck)                          │
 │                                                                          │
-│  avellaneda-stoikov  ←  Closed-form A-S market maker                   │
-│  Sharpe 10.0 vs 3.6 baseline · 87 tests · multi-agent LOB simulation   │
+│  avellaneda-stoikov  ←  Closed-form A-S market maker                     │
+│  Sharpe 10.0 vs 3.6 baseline · 87 tests · multi-agent LOB simulation     │
 │                                                                          │
-│  lob-microstructure-calibration  ←  Kyle λ · Roll · kappa MLE · OFI   │
-│  HAC-robust OLS · Bartlett-corrected autocovariance · 18 tests         │
+│  lob-microstructure-calibration  ←  Kyle λ · Roll · kappa MLE · OFI      │
+│  HAC-robust OLS · Bartlett-corrected autocovariance · 18 tests           │
 └──────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          FUNCTIONAL SYSTEMS                              │
 │                                                                          │
-│  ocaml-trading-primitives  ←  Functional LOB in OCaml                  │
-│  Make(P:PRIORITY) functor · CME Rule 512.B · 11/11 QCheck tests        │
+│  ocaml-trading-primitives  ←  Functional LOB in OCaml                    │
+│  Make(P:PRIORITY) functor · CME Rule 512.B · 11/11 QCheck tests          │
 │                                                                          │
-│  competitive-programming  ←  Trading-oriented algorithms                │
-│  SegTree · SparseTable O(1) RMQ · DSU+rollback · CHT · 16/16 tests    │
+│  competitive-programming  ←  Trading-oriented algorithms                 │
+│  SegTree · SparseTable O(1) RMQ · DSU+rollback · CHT · 16/16 tests       │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
