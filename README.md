@@ -33,4 +33,4 @@ M.S. in Computer Science, Texas A&M University–Commerce · Post-Graduate Certi
 
 #### Contact
 
-[LinkedIn](https://www.linkedin.com/in/nishant-gemawat-206969118) · ngemaw@outlook.com
+[LinkedIn](https://www.linkedin.com/in/nishant-gemawat-206969118) · nisgem@gmail.com
